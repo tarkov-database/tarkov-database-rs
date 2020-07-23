@@ -18,6 +18,9 @@ pub enum Error {
     RequestError(#[error(source)] awc::error::SendRequestError),
     #[error(display = "JSON parsing error: {}", _0)]
     JSONError(#[error(source)] awc::error::JsonPayloadError),
+    #[cfg(feature = "openssl")]
+    #[error(display = "OpenSSL error: {}", _0)]
+    OpenSSLError(#[error(source)] open_ssl::error::ErrorStack),
 }
 
 pub type Result<T> = result::Result<T, Error>;
