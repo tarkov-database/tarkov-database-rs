@@ -104,7 +104,6 @@ impl ClientBuilder {
         let client = ActixClientBuilder::default()
             .connector(connector.finish())
             .header(USER_AGENT, USER_AGENT_VALUE)
-            .bearer_auth(&self.token)
             .finish();
 
         let host = if let Some(h) = &self.host {
@@ -160,7 +159,6 @@ impl Client {
     pub fn new(token: &str) -> Self {
         let client = ActixClientBuilder::default()
             .header(USER_AGENT, USER_AGENT_VALUE)
-            .bearer_auth(token)
             .finish();
 
         let host = format!("{}{}", DEFAULT_HOST, ENDPOINT_VERSION);
