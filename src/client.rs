@@ -16,7 +16,7 @@ use serde::{de::DeserializeOwned, Deserialize};
 #[cfg(feature = "openssl")]
 use open_ssl::ssl::{SslConnector, SslFiletype, SslMethod};
 
-const USER_AGENT_VALUE: &'static str =
+const USER_AGENT_DEFAULT: &'static str =
     concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"));
 
 const RESPONSE_BODY_LIMIT: usize = 1024_000;
@@ -57,13 +57,21 @@ struct TokenClaims {
 pub struct ClientBuilder {
     token: String,
     host: Option<String>,
+    user_agent: Option<String>,
     ssl: ClientSSL,
 }
 
 impl ClientBuilder {
-    /// Set host
+    /// Set alternative host
     pub fn set_host(mut self, host: &str) -> Self {
         self.host = Some(host.to_string());
+
+        self
+    }
+
+    /// Set custom User-Agent header
+    pub fn set_user_agent(mut self, user_agent: &str) -> Self {
+        self.user_agent = Some(user_agent.to_string());
 
         self
     }
@@ -103,7 +111,11 @@ impl ClientBuilder {
 
         let client = ActixClientBuilder::default()
             .connector(connector.finish())
-            .header(USER_AGENT, USER_AGENT_VALUE)
+            .header(
+                USER_AGENT,
+                self.user_agent
+                    .unwrap_or_else(|| USER_AGENT_DEFAULT.to_string()),
+            )
             .finish();
 
         let host = if let Some(h) = &self.host {
@@ -158,7 +170,7 @@ impl Client {
     /// Create a default client
     pub fn new(token: &str) -> Self {
         let client = ActixClientBuilder::default()
-            .header(USER_AGENT, USER_AGENT_VALUE)
+            .header(USER_AGENT, USER_AGENT_DEFAULT)
             .finish();
 
         let host = format!("{}{}", DEFAULT_HOST, ENDPOINT_VERSION);
