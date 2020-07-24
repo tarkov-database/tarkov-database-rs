@@ -17,5 +17,5 @@ rust-tls = { version = "0.17", package = "rustls", optional = true }
 serde = { version = "1", features = ["derive"] }
 chrono = { version = "0.4", features = ["serde"] }
 jsonwebtoken = "7"
-err-derive = "0.2"
+thiserror = "1"
 env_logger = "0.7"

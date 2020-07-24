@@ -2,7 +2,7 @@ use crate::client::StatusResponse;
 
 use std::result;
 
-use err_derive::Error;
+use thiserror::Error;
 
 pub mod client;
 pub mod model;
@@ -12,15 +12,15 @@ const ENDPOINT_VERSION: &'static str = "/v2";
 
 #[derive(Debug, Error)]
 pub enum Error {
-    #[error(display = "API error: {}", _0)]
+    #[error("API error: {0}")]
     APIError(StatusResponse),
-    #[error(display = "Client request error: {}", _0)]
-    RequestError(#[error(source)] awc::error::SendRequestError),
-    #[error(display = "JSON parsing error: {}", _0)]
-    JSONError(#[error(source)] awc::error::JsonPayloadError),
+    #[error("Client request error: {0}")]
+    RequestError(#[from] awc::error::SendRequestError),
+    #[error("JSON parsing error: {0}")]
+    JSONError(#[from] awc::error::JsonPayloadError),
     #[cfg(feature = "openssl")]
-    #[error(display = "OpenSSL error: {}", _0)]
-    OpenSSLError(#[error(source)] open_ssl::error::ErrorStack),
+    #[error("OpenSSL error: {0}")]
+    OpenSSLError(#[from] open_ssl::error::ErrorStack),
 }
 
 pub type Result<T> = result::Result<T, Error>;
