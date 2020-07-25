@@ -6,7 +6,7 @@ use awc::http::PathAndQuery;
 use chrono::{serde::ts_seconds, DateTime, Utc};
 use serde::Deserialize;
 
-const ENDPOINT_ITEM: &'static str = "/item";
+const ENDPOINT_ITEM: &str = "/item";
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]

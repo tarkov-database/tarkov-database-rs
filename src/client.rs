@@ -137,7 +137,7 @@ impl ClientBuilder {
 
         Ok(Client {
             host,
-            token: self.token.to_owned(),
+            token: self.token,
             client,
         })
     }
