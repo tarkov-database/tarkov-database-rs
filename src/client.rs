@@ -2,8 +2,10 @@ use crate::{Error, Result, DEFAULT_HOST, ENDPOINT_VERSION};
 
 use std::fmt;
 
+#[cfg(any(feature = "openssl", feature = "rustls"))]
+use std::path::PathBuf;
 #[cfg(feature = "rustls")]
-use std::{io::BufReader, path::PathBuf, sync::Arc};
+use std::{io::BufReader, sync::Arc};
 
 use awc::{
     http::{
