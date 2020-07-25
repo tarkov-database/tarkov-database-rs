@@ -1,6 +1,9 @@
 use crate::{Error, Result, DEFAULT_HOST, ENDPOINT_VERSION};
 
-use std::{fmt, path::PathBuf};
+use std::fmt;
+
+#[cfg(feature = "rustls")]
+use std::{io::BufReader, path::PathBuf, sync::Arc};
 
 use awc::{
     http::{
@@ -16,10 +19,12 @@ use serde::{de::DeserializeOwned, Deserialize};
 #[cfg(feature = "openssl")]
 use open_ssl::ssl::{SslConnector, SslFiletype, SslMethod};
 
-const USER_AGENT_DEFAULT: &'static str =
-    concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"));
+#[cfg(feature = "rustls")]
+use rust_tls::{internal::pemfile, ClientConfig};
 
-const RESPONSE_BODY_LIMIT: usize = 1024_000;
+const DEFAULT_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"));
+
+const RESPONSE_BODY_LIMIT: usize = 1_024_000;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -58,6 +63,7 @@ pub struct ClientBuilder {
     token: String,
     host: Option<String>,
     user_agent: Option<String>,
+    #[cfg(any(feature = "openssl", feature = "rustls"))]
     ssl: ClientSSL,
 }
 
@@ -84,6 +90,7 @@ impl ClientBuilder {
     }
 
     /// Set path to CA certificate file in PEM format
+    #[cfg(any(feature = "openssl", feature = "rustls"))]
     pub fn set_ca<T: Into<PathBuf>>(mut self, root_ca: T) -> Self {
         let ca = root_ca.into();
 
@@ -93,6 +100,7 @@ impl ClientBuilder {
     }
 
     /// Set path to certificate and private key file in PEM format. Used for TLS client authentication
+    #[cfg(any(feature = "openssl", feature = "rustls"))]
     pub fn set_keypair<T: Into<PathBuf>>(mut self, certificate: T, private_key: T) -> Self {
         let cert = certificate.into();
         let key = private_key.into();
@@ -106,15 +114,18 @@ impl ClientBuilder {
     pub fn build(self) -> Result<Client> {
         let connector = Connector::new();
 
-        #[cfg(feature = "openssl")]
+        #[cfg(all(not(feature = "rustls"), feature = "openssl"))]
         let connector = connector.ssl(self.ssl.openssl_connector()?);
+
+        #[cfg(all(not(feature = "openssl"), feature = "rustls"))]
+        let connector = connector.rustls(Arc::new(self.ssl.rustls_connector()?));
 
         let client = ActixClientBuilder::default()
             .connector(connector.finish())
             .header(
                 USER_AGENT,
                 self.user_agent
-                    .unwrap_or_else(|| USER_AGENT_DEFAULT.to_string()),
+                    .unwrap_or_else(|| DEFAULT_USER_AGENT.to_string()),
             )
             .finish();
 
@@ -132,6 +143,7 @@ impl ClientBuilder {
     }
 }
 
+#[cfg(any(feature = "openssl", feature = "rustls"))]
 #[derive(Debug, Default)]
 struct ClientSSL {
     root_ca: Option<PathBuf>,
@@ -139,8 +151,9 @@ struct ClientSSL {
     private_key: Option<PathBuf>,
 }
 
+#[cfg(any(feature = "openssl", feature = "rustls"))]
 impl ClientSSL {
-    #[cfg(feature = "openssl")]
+    #[cfg(all(not(feature = "rustls"), feature = "openssl"))]
     fn openssl_connector(&self) -> Result<SslConnector> {
         let mut builder = SslConnector::builder(SslMethod::tls_client())?;
 
@@ -156,6 +169,39 @@ impl ClientSSL {
 
         Ok(builder.build())
     }
+
+    #[cfg(all(not(feature = "openssl"), feature = "rustls"))]
+    fn rustls_connector(&self) -> Result<ClientConfig> {
+        let mut config = ClientConfig::new();
+
+        if let Some(f) = &self.certificate {
+            let mut buf = BufReader::new(fs::File::open(f)?);
+            let cert = pemfile::certs(&mut buf).unwrap();
+
+            let key = if let Some(f) = &self.private_key {
+                let mut buf = BufReader::new(fs::File::open(f)?);
+                pemfile::rsa_private_keys(&mut buf)
+                    .unwrap()
+                    .first()
+                    .unwrap()
+                    .to_owned()
+            } else {
+                return Err(Error::IOError(io::Error::new(
+                    io::ErrorKind::Other,
+                    "Private key is missing",
+                )));
+            };
+
+            config.set_single_client_cert(cert, key)?;
+        }
+
+        if let Some(f) = &self.root_ca {
+            let mut buf = BufReader::new(fs::File::open(f)?);
+            config.root_store.add_pem_file(&mut buf).unwrap();
+        }
+
+        Ok(config)
+    }
 }
 
 pub struct Client {
@@ -170,7 +216,7 @@ impl Client {
     /// Create a default client
     pub fn new(token: &str) -> Self {
         let client = ActixClientBuilder::default()
-            .header(USER_AGENT, USER_AGENT_DEFAULT)
+            .header(USER_AGENT, DEFAULT_USER_AGENT)
             .finish();
 
         let host = format!("{}{}", DEFAULT_HOST, ENDPOINT_VERSION);
