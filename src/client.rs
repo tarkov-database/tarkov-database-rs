@@ -5,7 +5,7 @@ use std::fmt;
 #[cfg(any(feature = "openssl", feature = "rustls"))]
 use std::path::PathBuf;
 #[cfg(feature = "rustls")]
-use std::{io::BufReader, sync::Arc};
+use std::{fs, io, io::BufReader, sync::Arc};
 
 use awc::{
     http::{
