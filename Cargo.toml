@@ -1,6 +1,6 @@
 [package]
 name = "tarkov-database-rs"
-version = "0.1.0-alpha.6"
+version = "0.1.0-alpha.7"
 authors = ["Markus Wiegand <mail@morphy2k.dev>"]
 edition = "2018"
 
@@ -11,7 +11,7 @@ openssl = ["open-ssl", "awc/openssl"]
 rustls = ["rust-tls", "awc/rustls"]
 
 [dependencies]
-awc = "2.0.0-beta.3"
+awc = "2"
 open-ssl = { version = "0.10", package = "openssl", optional = true }
 rust-tls = { version = "0.18", package = "rustls", optional = true }
 serde = { version = "1", features = ["derive"] }
