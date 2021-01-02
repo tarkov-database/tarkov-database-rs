@@ -93,7 +93,7 @@ impl Client {
         Ok(resp)
     }
 
-    pub async fn get_all_items(&self) -> Result<Vec<Item>> {
+    pub async fn get_items_all(&self) -> Result<Vec<Item>> {
         let index = self.get_item_index().await?;
 
         let limit = Self::MAX_PAGE_LIMIT;
