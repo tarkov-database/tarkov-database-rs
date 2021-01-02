@@ -14,8 +14,6 @@ use awc::{
     },
     Client as ActixClient, ClientBuilder as ActixClientBuilder, Connector,
 };
-use chrono::{serde::ts_seconds, DateTime, Utc};
-use jsonwebtoken::dangerous_insecure_decode;
 use serde::{de::DeserializeOwned, Deserialize};
 
 #[cfg(feature = "openssl")]
@@ -40,24 +38,6 @@ impl fmt::Display for StatusResponse {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{} {}: {}", self.code, self.status, self.message)
     }
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct TokenResponse {
-    token: String,
-}
-
-#[derive(Debug, Deserialize)]
-struct TokenClaims {
-    aud: String,
-    #[serde(with = "ts_seconds")]
-    exp: DateTime<Utc>,
-    #[serde(with = "ts_seconds")]
-    iat: DateTime<Utc>,
-    iss: String,
-    sub: String,
-    scope: Vec<String>,
 }
 
 #[derive(Debug, Default)]
@@ -208,8 +188,8 @@ impl ClientSSL {
 
 pub struct Client {
     host: String,
-    token: String,
     client: ActixClient,
+    pub(crate) token: String,
 }
 
 impl Client {
@@ -247,30 +227,5 @@ impl Client {
         let data = res.json().limit(RESPONSE_BODY_LIMIT).await?;
 
         Ok(data)
-    }
-
-    /// Validate set token
-    pub fn token_is_valid(&self) -> bool {
-        let claims = match dangerous_insecure_decode::<TokenClaims>(&self.token) {
-            Ok(d) => d.claims,
-            Err(_) => return false,
-        };
-
-        let now = Utc::now();
-
-        if now.ge(&claims.exp) {
-            return false;
-        }
-
-        true
-    }
-
-    /// Refresh authentication token
-    pub async fn refresh_token(&mut self) -> Result<()> {
-        let resp: TokenResponse = self.get_json("token".parse().unwrap()).await?;
-
-        self.token = resp.token;
-
-        Ok(())
     }
 }

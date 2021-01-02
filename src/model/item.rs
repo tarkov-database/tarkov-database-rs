@@ -10,12 +10,6 @@ const ENDPOINT_ITEM: &str = "/item";
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct TokenResponse {
-    pub token: String,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct ItemIndex {
     pub total: i64,
     #[serde(with = "ts_seconds")]
