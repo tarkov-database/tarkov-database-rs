@@ -40,6 +40,50 @@ impl fmt::Display for StatusResponse {
     }
 }
 
+pub struct Client {
+    host: String,
+    client: ActixClient,
+    pub(crate) token: String,
+}
+
+impl Client {
+    pub(crate) const MAX_PAGE_LIMIT: i64 = 100;
+
+    /// Create a default client
+    pub fn new(token: &str) -> Self {
+        let client = ActixClientBuilder::default()
+            .header(USER_AGENT, DEFAULT_USER_AGENT)
+            .finish();
+
+        let host = format!("{}{}", DEFAULT_HOST, ENDPOINT_VERSION);
+
+        Self {
+            host,
+            token: token.to_string(),
+            client,
+        }
+    }
+
+    pub(crate) async fn get_json<T: DeserializeOwned>(&self, path: PathAndQuery) -> Result<T> {
+        let req = self
+            .client
+            .request(Method::GET, format!("{}{}", self.host, path))
+            .bearer_auth(&self.token)
+            .set(ContentType::json());
+
+        let mut res = req.send().await?;
+
+        if !res.status().is_success() {
+            let sr: StatusResponse = res.json().await?;
+            return Err(Error::APIError(sr));
+        }
+
+        let data = res.json().limit(RESPONSE_BODY_LIMIT).await?;
+
+        Ok(data)
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct ClientBuilder {
     token: String,
@@ -183,49 +227,5 @@ impl ClientSSL {
         }
 
         Ok(config)
-    }
-}
-
-pub struct Client {
-    host: String,
-    client: ActixClient,
-    pub(crate) token: String,
-}
-
-impl Client {
-    pub(crate) const MAX_PAGE_LIMIT: i64 = 100;
-
-    /// Create a default client
-    pub fn new(token: &str) -> Self {
-        let client = ActixClientBuilder::default()
-            .header(USER_AGENT, DEFAULT_USER_AGENT)
-            .finish();
-
-        let host = format!("{}{}", DEFAULT_HOST, ENDPOINT_VERSION);
-
-        Self {
-            host,
-            token: token.to_string(),
-            client,
-        }
-    }
-
-    pub(crate) async fn get_json<T: DeserializeOwned>(&self, path: PathAndQuery) -> Result<T> {
-        let req = self
-            .client
-            .request(Method::GET, format!("{}{}", self.host, path))
-            .bearer_auth(&self.token)
-            .set(ContentType::json());
-
-        let mut res = req.send().await?;
-
-        if !res.status().is_success() {
-            let sr: StatusResponse = res.json().await?;
-            return Err(Error::APIError(sr));
-        }
-
-        let data = res.json().limit(RESPONSE_BODY_LIMIT).await?;
-
-        Ok(data)
     }
 }
