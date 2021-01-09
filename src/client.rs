@@ -29,9 +29,9 @@ const RESPONSE_BODY_LIMIT: usize = 1_024_000;
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct StatusResponse {
-    status: String,
-    message: String,
-    code: u16,
+    pub status: String,
+    pub message: String,
+    pub code: u16,
 }
 
 impl fmt::Display for StatusResponse {
