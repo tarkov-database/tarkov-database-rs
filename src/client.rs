@@ -1,4 +1,4 @@
-use crate::{Error, Result, DEFAULT_HOST, ENDPOINT_VERSION};
+use crate::{Result, DEFAULT_HOST, ENDPOINT_VERSION};
 
 use std::fmt;
 
@@ -75,7 +75,7 @@ impl Client {
 
         if !res.status().is_success() {
             let sr: StatusResponse = res.json().await?;
-            return Err(Error::APIError(sr));
+            return Err(sr.into());
         }
 
         let data = res.json().limit(RESPONSE_BODY_LIMIT).await?;
