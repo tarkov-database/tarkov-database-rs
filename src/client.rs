@@ -84,7 +84,7 @@ impl Client {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct ClientBuilder {
     token: String,
     host: Option<String>,
@@ -170,7 +170,7 @@ impl ClientBuilder {
 }
 
 #[cfg(any(feature = "openssl", feature = "rustls"))]
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 struct ClientSSL {
     root_ca: Option<PathBuf>,
     certificate: Option<PathBuf>,
