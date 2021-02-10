@@ -8,10 +8,7 @@ use std::path::PathBuf;
 use std::{fs, io, io::BufReader, sync::Arc};
 
 use awc::{
-    http::{
-        header::{ContentType, USER_AGENT},
-        Method, PathAndQuery,
-    },
+    http::{header::USER_AGENT, Method, PathAndQuery},
     Client as ActixClient, ClientBuilder as ActixClientBuilder, Connector,
 };
 use serde::{de::DeserializeOwned, Deserialize};
@@ -68,8 +65,7 @@ impl Client {
         let req = self
             .client
             .request(Method::GET, format!("{}{}", self.host, path))
-            .bearer_auth(&self.token)
-            .set(ContentType::json());
+            .bearer_auth(&self.token);
 
         let mut res = req.send().await?;
 
@@ -212,10 +208,7 @@ impl ClientSSL {
                     .unwrap()
                     .to_owned()
             } else {
-                return Err(Error::IOError(io::Error::new(
-                    io::ErrorKind::Other,
-                    "Private key is missing",
-                )));
+                return Err(io::Error::new(io::ErrorKind::Other, "Private key is missing").into());
             };
 
             config.set_single_client_cert(cert, key)?;
