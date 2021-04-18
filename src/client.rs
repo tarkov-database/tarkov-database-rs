@@ -48,7 +48,7 @@ impl Client {
 
     /// Create a default client
     pub fn new(token: &str) -> Self {
-        let client = ActixClientBuilder::default()
+        let client = ActixClientBuilder::new()
             .header(USER_AGENT, DEFAULT_USER_AGENT)
             .finish();
 
@@ -142,8 +142,8 @@ impl ClientBuilder {
         #[cfg(all(not(feature = "openssl"), feature = "rustls"))]
         let connector = connector.rustls(Arc::new(self.ssl.rustls_connector()?));
 
-        let client = ActixClientBuilder::default()
-            .connector(connector.finish())
+        let client = ActixClientBuilder::new()
+            .connector(connector)
             .header(
                 USER_AGENT,
                 self.user_agent

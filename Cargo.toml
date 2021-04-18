@@ -11,7 +11,7 @@ openssl = ["open-ssl", "awc/openssl"]
 rustls = ["rust-tls", "awc/rustls"]
 
 [dependencies]
-awc = "3.0.0-beta.2"
+awc = "3.0.0-beta.5"
 open-ssl = { version = "0.10", package = "openssl", optional = true }
 rust-tls = { version = "0.19", package = "rustls", optional = true }
 serde = { version = "1", features = ["derive"] }
