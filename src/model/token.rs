@@ -10,6 +10,8 @@ const ENDPOINT_TOKEN: &str = "/token";
 #[serde(rename_all = "camelCase")]
 struct TokenResponse {
     token: String,
+    #[serde(with = "ts_seconds")]
+    expires: DateTime<Utc>,
 }
 
 #[derive(Debug, Deserialize)]
