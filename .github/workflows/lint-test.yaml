@@ -24,7 +24,7 @@ jobs:
       with:
         command: generate-lockfile
 
-    - uses: actions/cache@v2
+    - uses: actions/cache@v2.1.5
       env:
         cache-name: lint
       with:
@@ -68,7 +68,7 @@ jobs:
       with:
         command: generate-lockfile
 
-    - uses: actions/cache@v2
+    - uses: actions/cache@v2.1.5
       env:
         cache-name: test
       with:
