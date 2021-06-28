@@ -20,7 +20,7 @@ jobs:
           override: true
 
     - name: Generate lockfile
-      uses: actions-rs/cargo@v1
+      uses: actions-rs/cargo@v1.0.3
       with:
         command: generate-lockfile
 
@@ -44,7 +44,7 @@ jobs:
         args: --all-features
 
     - name: Run Rustfmt
-      uses: actions-rs/cargo@v1
+      uses: actions-rs/cargo@v1.0.3
       with:
         command: fmt
         args: -- --check
@@ -64,7 +64,7 @@ jobs:
           override: true
 
     - name: Generate lockfile
-      uses: actions-rs/cargo@v1
+      uses: actions-rs/cargo@v1.0.3
       with:
         command: generate-lockfile
 
@@ -82,6 +82,6 @@ jobs:
           ${{ runner.os }}-cargo-
 
     - name: Run tests
-      uses: actions-rs/cargo@v1
+      uses: actions-rs/cargo@v1.0.3
       with:
         command: test
