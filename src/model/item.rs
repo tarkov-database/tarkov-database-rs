@@ -2,7 +2,7 @@ use crate::{client::Client, Result};
 
 use std::collections::HashMap;
 
-use awc::http::PathAndQuery;
+use awc::http::uri::PathAndQuery;
 use chrono::{serde::ts_seconds, DateTime, Utc};
 use serde::Deserialize;
 

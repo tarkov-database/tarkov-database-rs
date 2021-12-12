@@ -8,7 +8,7 @@ use std::path::PathBuf;
 use std::{fs, io, io::BufReader, sync::Arc};
 
 use awc::{
-    http::{header::USER_AGENT, Method, PathAndQuery},
+    http::{header::USER_AGENT, uri::PathAndQuery, Method},
     Client as ActixClient, ClientBuilder as ActixClientBuilder, Connector,
 };
 use serde::{de::DeserializeOwned, Deserialize};
