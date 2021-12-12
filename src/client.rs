@@ -1,6 +1,6 @@
 use crate::{Result, DEFAULT_HOST, ENDPOINT_VERSION};
 
-use std::fmt;
+use std::{fmt, time::Duration};
 
 #[cfg(any(feature = "openssl", feature = "rustls"))]
 use std::path::PathBuf;
@@ -22,6 +22,8 @@ use rust_tls::{internal::pemfile, ClientConfig};
 const DEFAULT_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"));
 
 const RESPONSE_BODY_LIMIT: usize = 1_024_000;
+
+const TIMEOUT: Duration = Duration::from_secs(30);
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -50,6 +52,7 @@ impl Client {
     pub fn new(token: &str) -> Self {
         let client = ActixClientBuilder::new()
             .header(USER_AGENT, DEFAULT_USER_AGENT)
+            .timeout(TIMEOUT)
             .finish();
 
         let host = format!("{}{}", DEFAULT_HOST, ENDPOINT_VERSION);
@@ -85,6 +88,7 @@ pub struct ClientBuilder {
     token: String,
     host: Option<String>,
     user_agent: Option<String>,
+    timeout: Option<Duration>,
     #[cfg(any(feature = "openssl", feature = "rustls"))]
     ssl: ClientSSL,
 }
@@ -107,6 +111,13 @@ impl ClientBuilder {
     /// Set authentication token
     pub fn set_token(mut self, token: &str) -> Self {
         self.token = token.to_string();
+
+        self
+    }
+
+    /// Set authentication token
+    pub fn set_timeout(mut self, timeout: Duration) -> Self {
+        self.timeout = Some(timeout);
 
         self
     }
@@ -149,6 +160,7 @@ impl ClientBuilder {
                 self.user_agent
                     .unwrap_or_else(|| DEFAULT_USER_AGENT.to_string()),
             )
+            .timeout(self.timeout.unwrap_or(TIMEOUT))
             .finish();
 
         let host = if let Some(h) = &self.host {
