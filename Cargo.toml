@@ -14,7 +14,7 @@ native-tls = ["reqwest/native-tls"]
 rustls = ["reqwest/rustls-tls"]
 
 [dependencies]
-tokio = { version = "1", features = ["fs"], default-features = false }
+tokio = { version = "1", features = ["fs", "sync"], default-features = false }
 reqwest = { version = "0.11", features = [
     "json",
     "trust-dns",

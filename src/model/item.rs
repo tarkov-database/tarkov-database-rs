@@ -126,7 +126,7 @@ mod tests {
     async fn get_index() {
         let mut client = Client::new(API_TOKEN.unwrap()).unwrap();
 
-        if !client.token_is_valid() {
+        if !client.token_is_valid().await {
             client.refresh_token().await.unwrap();
         }
 

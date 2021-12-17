@@ -58,14 +58,16 @@ impl Client {
 
         let resp: TokenResponse = self.get_json(path).await?;
 
-        self.token = resp.token;
+        let mut token = self.token.write().await;
+        *token = resp.token;
 
         Ok(())
     }
 
     /// Validate set token
-    pub fn token_is_valid(&self) -> bool {
-        let claims = match dangerous_insecure_decode::<TokenClaims>(&self.token) {
+    pub async fn token_is_valid(&self) -> bool {
+        let token = &self.token.read().await;
+        let claims = match dangerous_insecure_decode::<TokenClaims>(token) {
             Ok(d) => d.claims,
             Err(_) => return false,
         };

@@ -1,12 +1,13 @@
 use crate::{Result, DEFAULT_ORIGIN, ENDPOINT_VERSION};
 
-use std::{fmt, time::Duration};
+use std::{fmt, sync::Arc, time::Duration};
 
 #[cfg(any(feature = "native-tls", feature = "rustls"))]
 use reqwest::tls;
 use reqwest::{Method, Url};
 #[cfg(any(feature = "native-tls", feature = "rustls"))]
 use std::path::PathBuf;
+use tokio::sync::RwLock;
 
 use serde::{de::DeserializeOwned, Deserialize};
 
@@ -53,11 +54,11 @@ impl PathAndQuery {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Client {
     base_url: Url,
-    client: reqwest::Client,
-    pub(crate) token: String,
+    http_client: reqwest::Client,
+    pub(crate) token: Arc<RwLock<String>>,
 }
 
 impl Client {
@@ -75,10 +76,12 @@ impl Client {
 
         let base_url = Url::parse(DEFAULT_ORIGIN)?.join(&format!("{}/", ENDPOINT_VERSION))?;
 
+        let token = Arc::new(RwLock::new(token.to_string()));
+
         Ok(Self {
             base_url,
-            token: token.to_string(),
-            client: builder.build()?,
+            token,
+            http_client: builder.build()?,
         })
     }
 
@@ -92,14 +95,14 @@ impl Client {
         }
 
         let req = self
-            .client
+            .http_client
             .request(Method::GET, url)
-            .bearer_auth(&self.token)
+            .bearer_auth(&self.token.read().await)
             .build()?;
 
         tracing_request(&req);
 
-        let res = self.client.execute(req).await?;
+        let res = self.http_client.execute(req).await?;
 
         tracing_response(&res);
 
@@ -252,10 +255,12 @@ impl ClientBuilder {
             builder
         };
 
+        let token = Arc::new(RwLock::new(self.token.to_string()));
+
         Ok(Client {
             base_url,
-            token: self.token,
-            client: builder.build()?,
+            token,
+            http_client: builder.build()?,
         })
     }
 }
