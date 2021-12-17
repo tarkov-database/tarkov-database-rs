@@ -178,8 +178,8 @@ impl ClientBuilder {
     /// Enables/Disables the trust-dns async resolver.
     ///
     /// Default: true
-    pub fn set_trust_dns(mut self, trust_dns: bool) -> Self {
-        self.trust_dns = Some(trust_dns);
+    pub fn set_trust_dns(mut self, enable: bool) -> Self {
+        self.trust_dns = Some(enable);
 
         self
     }
