@@ -67,6 +67,7 @@ impl Client {
     pub fn new(token: &str) -> Result<Self> {
         let builder = reqwest::Client::builder()
             .timeout(TIMEOUT)
+            .https_only(true)
             .user_agent(DEFAULT_USER_AGENT);
 
         #[cfg(any(feature = "native-tls", feature = "rustls"))]
@@ -227,6 +228,12 @@ impl ClientBuilder {
             Url::parse(h)?.join(&format!("{}/", ENDPOINT_VERSION))?
         } else {
             Url::parse(DEFAULT_ORIGIN)?.join(&format!("{}/", ENDPOINT_VERSION))?
+        };
+
+        let builder = if base_url.scheme() == "https" {
+            builder.https_only(true)
+        } else {
+            builder
         };
 
         Ok(Client {
