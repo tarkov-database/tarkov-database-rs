@@ -1,10 +1,12 @@
-use crate::{client::Client, Result};
+use crate::{
+    client::{Client, PathAndQuery},
+    Result,
+};
 
-use awc::http::uri::PathAndQuery;
 use chrono::{serde::ts_seconds, DateTime, Utc};
 use serde::Deserialize;
 
-const ENDPOINT_LOCATION: &str = "/location";
+const ENDPOINT_LOCATION: &str = "location";
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -54,19 +56,18 @@ pub struct Boss {
 
 impl Client {
     pub async fn get_locations_all(&self, limit: i64, offset: i64) -> Result<LocationResult> {
-        let path: PathAndQuery = format!("{}?limit={}&offset={}", ENDPOINT_LOCATION, limit, offset)
-            .parse()
-            .unwrap();
+        let mut path = PathAndQuery::new(ENDPOINT_LOCATION.to_string());
+        path.add_query_pair("limit", limit);
+        path.add_query_pair("offset", offset);
 
         let resp = self.get_json(path).await?;
 
         Ok(resp)
     }
 
-    pub async fn get_locations_by_availability(&self, email: &str) -> Result<LocationResult> {
-        let path: PathAndQuery = format!("{}?available={}", ENDPOINT_LOCATION, email)
-            .parse()
-            .unwrap();
+    pub async fn get_locations_by_availability(&self, available: &str) -> Result<LocationResult> {
+        let mut path = PathAndQuery::new(ENDPOINT_LOCATION.to_string());
+        path.add_query_pair("available", available);
 
         let resp = self.get_json(path).await?;
 
@@ -74,7 +75,7 @@ impl Client {
     }
 
     pub async fn get_location_by_id(&self, id: &str) -> Result<Location> {
-        let path: PathAndQuery = format!("{}/{}", ENDPOINT_LOCATION, id).parse().unwrap();
+        let path = PathAndQuery::new(format!("{}/{}", ENDPOINT_LOCATION, id));
 
         let resp = self.get_json(path).await?;
 

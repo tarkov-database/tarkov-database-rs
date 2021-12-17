@@ -1,10 +1,13 @@
-use crate::{client::Client, Result};
+use crate::{
+    client::{Client, PathAndQuery},
+    Result,
+};
 
 use chrono::{serde::ts_seconds, DateTime, Utc};
 use jsonwebtoken::dangerous_insecure_decode;
 use serde::Deserialize;
 
-const ENDPOINT_TOKEN: &str = "/token";
+const ENDPOINT_TOKEN: &str = "token";
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -51,7 +54,9 @@ enum Scope {
 impl Client {
     /// Refresh authentication token
     pub async fn refresh_token(&mut self) -> Result<()> {
-        let resp: TokenResponse = self.get_json(ENDPOINT_TOKEN.parse().unwrap()).await?;
+        let path = PathAndQuery::new(ENDPOINT_TOKEN.to_string());
+
+        let resp: TokenResponse = self.get_json(path).await?;
 
         self.token = resp.token;
 

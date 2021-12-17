@@ -1,23 +1,14 @@
-use crate::{Result, DEFAULT_HOST, ENDPOINT_VERSION};
+use crate::{Result, DEFAULT_ORIGIN, ENDPOINT_VERSION};
 
 use std::{fmt, time::Duration};
 
-#[cfg(any(feature = "openssl", feature = "rustls"))]
+#[cfg(any(feature = "native-tls", feature = "rustls"))]
+use reqwest::tls;
+use reqwest::{Method, Url};
+#[cfg(any(feature = "native-tls", feature = "rustls"))]
 use std::path::PathBuf;
-#[cfg(feature = "rustls")]
-use std::{fs, io, io::BufReader, sync::Arc};
 
-use awc::{
-    http::{header::USER_AGENT, uri::PathAndQuery, Method},
-    Client as ActixClient, ClientBuilder as ActixClientBuilder, Connector,
-};
 use serde::{de::DeserializeOwned, Deserialize};
-
-#[cfg(feature = "openssl")]
-use open_ssl::ssl::{SslConnector, SslFiletype, SslMethod};
-
-#[cfg(feature = "rustls")]
-use rust_tls::{internal::pemfile, ClientConfig};
 
 const DEFAULT_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"));
 
@@ -39,9 +30,33 @@ impl fmt::Display for StatusResponse {
     }
 }
 
+#[derive(Debug)]
+pub(crate) struct PathAndQuery {
+    path: String,
+    query: Vec<(String, String)>,
+}
+
+impl PathAndQuery {
+    pub(crate) fn new(path: String) -> Self {
+        Self {
+            path,
+            query: Vec::new(),
+        }
+    }
+
+    pub(crate) fn add_query_pair<K, V>(&mut self, key: K, value: V)
+    where
+        K: ToString,
+        V: ToString,
+    {
+        self.query.push((key.to_string(), value.to_string()));
+    }
+}
+
+#[derive(Debug)]
 pub struct Client {
-    host: String,
-    client: ActixClient,
+    base_url: Url,
+    client: reqwest::Client,
     pub(crate) token: String,
 }
 
@@ -49,35 +64,50 @@ impl Client {
     pub(crate) const MAX_PAGE_LIMIT: i64 = 100;
 
     /// Create a default client
-    pub fn new(token: &str) -> Self {
-        let client = ActixClientBuilder::new()
-            .header(USER_AGENT, DEFAULT_USER_AGENT)
+    pub fn new(token: &str) -> Result<Self> {
+        let builder = reqwest::Client::builder()
             .timeout(TIMEOUT)
-            .finish();
+            .user_agent(DEFAULT_USER_AGENT);
 
-        let host = format!("{}{}", DEFAULT_HOST, ENDPOINT_VERSION);
+        #[cfg(any(feature = "native-tls", feature = "rustls"))]
+        let builder = builder.min_tls_version(tls::Version::TLS_1_2);
 
-        Self {
-            host,
+        let base_url = Url::parse(DEFAULT_ORIGIN)?.join(&format!("{}/", ENDPOINT_VERSION))?;
+
+        Ok(Self {
+            base_url,
             token: token.to_string(),
-            client,
-        }
+            client: builder.build()?,
+        })
     }
 
-    pub(crate) async fn get_json<T: DeserializeOwned>(&self, path: PathAndQuery) -> Result<T> {
+    pub(crate) async fn get_json<T>(&self, path: PathAndQuery) -> Result<T>
+    where
+        T: DeserializeOwned,
+    {
+        let mut url = self.base_url.join(&path.path)?;
+        if !path.query.is_empty() {
+            url.query_pairs_mut().extend_pairs(path.query).finish();
+        }
+
         let req = self
             .client
-            .request(Method::GET, format!("{}{}", self.host, path))
-            .bearer_auth(&self.token);
+            .request(Method::GET, url)
+            .bearer_auth(&self.token)
+            .build()?;
 
-        let mut res = req.send().await?;
+        tracing_request(&req);
+
+        let res = self.client.execute(req).await?;
+
+        tracing_response(&res);
 
         if !res.status().is_success() {
-            let sr: StatusResponse = res.json().await?;
+            let sr = res.json::<StatusResponse>().await?;
             return Err(sr.into());
         }
 
-        let data = res.json().limit(RESPONSE_BODY_LIMIT).await?;
+        let data = res.json::<T>().await?;
 
         Ok(data)
     }
@@ -86,17 +116,17 @@ impl Client {
 #[derive(Debug, Default, Clone)]
 pub struct ClientBuilder {
     token: String,
-    host: Option<String>,
+    origin: Option<String>,
     user_agent: Option<String>,
     timeout: Option<Duration>,
-    #[cfg(any(feature = "openssl", feature = "rustls"))]
-    ssl: ClientSSL,
+    #[cfg(any(feature = "native-tls", feature = "rustls"))]
+    tls: ClientTls,
 }
 
 impl ClientBuilder {
     /// Set alternative host
-    pub fn set_host(mut self, host: &str) -> Self {
-        self.host = Some(host.to_string());
+    pub fn set_origin(mut self, host: &str) -> Self {
+        self.origin = Some(host.to_string());
 
         self
     }
@@ -115,9 +145,20 @@ impl ClientBuilder {
         self
     }
 
-    /// Set authentication token
+    /// Set request timeout
+    ///
+    /// Default: 30 seconds
     pub fn set_timeout(mut self, timeout: Duration) -> Self {
         self.timeout = Some(timeout);
+
+        self
+    }
+
+    /// Set minimum TLS version
+    ///
+    /// Default: 1.2
+    pub fn set_min_tls(mut self, version: tls::Version) -> Self {
+        self.tls.min_version = Some(version);
 
         self
     }
@@ -127,110 +168,149 @@ impl ClientBuilder {
     pub fn set_ca<T: Into<PathBuf>>(mut self, root_ca: T) -> Self {
         let ca = root_ca.into();
 
-        self.ssl.root_ca = Some(ca);
+        self.tls.root_ca = Some(ca);
 
         self
     }
 
     /// Set path to certificate and private key file in PEM format. Used for TLS client authentication
-    #[cfg(any(feature = "openssl", feature = "rustls"))]
+    #[cfg(any(feature = "native-tls", feature = "rustls"))]
     pub fn set_keypair<T: Into<PathBuf>>(mut self, certificate: T, private_key: T) -> Self {
         let cert = certificate.into();
         let key = private_key.into();
 
-        self.ssl.certificate = Some(cert);
-        self.ssl.private_key = Some(key);
+        self.tls.certificate = Some(cert);
+        self.tls.private_key = Some(key);
 
         self
     }
 
-    pub fn build(self) -> Result<Client> {
-        let connector = Connector::new();
+    pub async fn build(self) -> Result<Client> {
+        let builder = reqwest::ClientBuilder::new();
 
-        #[cfg(all(not(feature = "rustls"), feature = "openssl"))]
-        let connector = connector.ssl(self.ssl.openssl_connector()?);
-
-        #[cfg(all(not(feature = "openssl"), feature = "rustls"))]
-        let connector = connector.rustls(Arc::new(self.ssl.rustls_connector()?));
-
-        let client = ActixClientBuilder::new()
-            .connector(connector)
-            .header(
-                USER_AGENT,
-                self.user_agent
-                    .unwrap_or_else(|| DEFAULT_USER_AGENT.to_string()),
-            )
-            .timeout(self.timeout.unwrap_or(TIMEOUT))
-            .finish();
-
-        let host = if let Some(h) = &self.host {
-            format!("{}{}", h, ENDPOINT_VERSION)
+        #[cfg(any(feature = "native-tls", feature = "rustls"))]
+        let builder = if let Some(v) = self.tls.min_version {
+            builder.min_tls_version(v)
         } else {
-            format!("{}{}", DEFAULT_HOST, ENDPOINT_VERSION)
+            builder.min_tls_version(tls::Version::TLS_1_2)
+        };
+
+        let builder = if let Some(v) = self.timeout {
+            builder.timeout(v)
+        } else {
+            builder
+        };
+
+        let builder = if let Some(v) = self.user_agent {
+            builder.user_agent(v)
+        } else {
+            builder
+        };
+
+        #[cfg(any(feature = "native-tls", feature = "rustls"))]
+        let builder = if self.tls.root_ca.is_some() {
+            let cert = self.tls.read_root_ca().await?;
+            builder.add_root_certificate(cert)
+        } else {
+            builder
+        };
+
+        #[cfg(feature = "rustls")]
+        let builder = if self.tls.certificate.is_some() {
+            let identity = self.tls.read_identity().await?;
+            builder.identity(identity)
+        } else {
+            builder
+        };
+
+        let base_url = if let Some(h) = &self.origin {
+            Url::parse(h)?.join(&format!("{}/", ENDPOINT_VERSION))?
+        } else {
+            Url::parse(DEFAULT_ORIGIN)?.join(&format!("{}/", ENDPOINT_VERSION))?
         };
 
         Ok(Client {
-            host,
+            base_url,
             token: self.token,
-            client,
+            client: builder.build()?,
         })
     }
 }
 
-#[cfg(any(feature = "openssl", feature = "rustls"))]
+#[derive(Debug, thiserror::Error)]
+pub enum ClientTlsError {
+    #[error("no root certficate specified")]
+    NoRootCA,
+    #[error("no private key specified")]
+    NoPrivateKey,
+    #[error("no certficate specified")]
+    NoCertificate,
+}
+
+#[cfg(any(feature = "native-tls", feature = "rustls"))]
 #[derive(Debug, Default, Clone)]
-struct ClientSSL {
+struct ClientTls {
     root_ca: Option<PathBuf>,
     certificate: Option<PathBuf>,
     private_key: Option<PathBuf>,
+    min_version: Option<tls::Version>,
 }
 
-#[cfg(any(feature = "openssl", feature = "rustls"))]
-impl ClientSSL {
-    #[cfg(all(not(feature = "rustls"), feature = "openssl"))]
-    fn openssl_connector(&self) -> Result<SslConnector> {
-        let mut builder = SslConnector::builder(SslMethod::tls_client())?;
+#[cfg(any(feature = "native-tls", feature = "rustls"))]
+impl ClientTls {
+    async fn read_root_ca(&self) -> Result<tls::Certificate> {
+        let cert = if let Some(p) = &self.root_ca {
+            let file = tokio::fs::read(p).await?;
+            tls::Certificate::from_pem(&file[..])?
+        } else {
+            return Err(ClientTlsError::NoRootCA.into());
+        };
 
-        if let Some(f) = &self.certificate {
-            builder.set_certificate_file(f, SslFiletype::PEM)?;
-        }
-        if let Some(f) = &self.private_key {
-            builder.set_private_key_file(f, SslFiletype::PEM)?;
-        }
-        if let Some(f) = &self.root_ca {
-            builder.set_ca_file(f)?;
-        }
-
-        Ok(builder.build())
+        Ok(cert)
     }
 
-    #[cfg(all(not(feature = "openssl"), feature = "rustls"))]
-    fn rustls_connector(&self) -> Result<ClientConfig> {
-        let mut config = ClientConfig::new();
+    #[cfg(feature = "rustls")]
+    async fn read_identity(&self) -> Result<tls::Identity> {
+        let mut cert = if let Some(p) = &self.certificate {
+            tokio::fs::read(p).await?
+        } else {
+            return Err(ClientTlsError::NoCertificate.into());
+        };
 
-        if let Some(f) = &self.certificate {
-            let mut buf = BufReader::new(fs::File::open(f)?);
-            let cert = pemfile::certs(&mut buf).unwrap();
+        let mut key = if let Some(p) = &self.private_key {
+            tokio::fs::read(p).await?
+        } else {
+            return Err(ClientTlsError::NoPrivateKey.into());
+        };
 
-            let key = if let Some(f) = &self.private_key {
-                let mut buf = BufReader::new(fs::File::open(f)?);
-                pemfile::rsa_private_keys(&mut buf)
-                    .unwrap()
-                    .first()
-                    .unwrap()
-                    .to_owned()
-            } else {
-                return Err(io::Error::new(io::ErrorKind::Other, "Private key is missing").into());
-            };
+        cert.append(&mut key);
 
-            config.set_single_client_cert(cert, key)?;
-        }
+        let identity = tls::Identity::from_pem(&cert[..])?;
 
-        if let Some(f) = &self.root_ca {
-            let mut buf = BufReader::new(fs::File::open(f)?);
-            config.root_store.add_pem_file(&mut buf).unwrap();
-        }
-
-        Ok(config)
+        Ok(identity)
     }
+}
+
+fn tracing_request(req: &reqwest::Request) {
+    let span = tracing::debug_span!(
+        "request",
+        req.method = ?req.method(),
+        req.url = ?req.url().as_str(),
+        req.version = ?req.version(),
+        headers = ?req.headers()
+    );
+
+    tracing::debug!(parent: &span, "sending request");
+}
+
+fn tracing_response(res: &reqwest::Response) {
+    let span = tracing::debug_span!(
+        "response",
+        req.status = ?res.status(),
+        req.url = ?res.url().as_str(),
+        req.version = ?res.version(),
+        headers = ?res.headers()
+    );
+
+    tracing::debug!(parent: &span, "response received");
 }

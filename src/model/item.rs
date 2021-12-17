@@ -1,12 +1,14 @@
-use crate::{client::Client, Result};
+use crate::{
+    client::{Client, PathAndQuery},
+    Result,
+};
 
 use std::collections::HashMap;
 
-use awc::http::uri::PathAndQuery;
 use chrono::{serde::ts_seconds, DateTime, Utc};
 use serde::Deserialize;
 
-const ENDPOINT_ITEM: &str = "/item";
+const ENDPOINT_ITEM: &str = "item";
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -70,7 +72,9 @@ pub struct RGBA {
 
 impl Client {
     pub async fn get_item_index(&self) -> Result<ItemIndex> {
-        let resp = self.get_json(ENDPOINT_ITEM.parse().unwrap()).await?;
+        let path = PathAndQuery::new(ENDPOINT_ITEM.to_string());
+
+        let resp = self.get_json(path).await?;
 
         Ok(resp)
     }
@@ -81,12 +85,9 @@ impl Client {
         limit: i64,
         offset: i64,
     ) -> Result<ItemResult> {
-        let path: PathAndQuery = format!(
-            "{}/{}?limit={}&offset={}",
-            ENDPOINT_ITEM, kind, limit, offset
-        )
-        .parse()
-        .unwrap();
+        let mut path = PathAndQuery::new(format!("{}/{}", ENDPOINT_ITEM, kind));
+        path.add_query_pair("limit", limit);
+        path.add_query_pair("offset", offset);
 
         let resp = self.get_json(path).await?;
 
@@ -112,5 +113,23 @@ impl Client {
         }
 
         Ok(items)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const API_TOKEN: Option<&str> = option_env!("TEST_API_TOKEN");
+
+    #[tokio::test]
+    async fn get_index() {
+        let mut client = Client::new(API_TOKEN.unwrap()).unwrap();
+
+        if !client.token_is_valid() {
+            client.refresh_token().await.unwrap();
+        }
+
+        client.get_item_index().await.unwrap();
     }
 }
