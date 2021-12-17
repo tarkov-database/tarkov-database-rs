@@ -120,6 +120,7 @@ pub struct ClientBuilder {
     origin: Option<String>,
     user_agent: Option<String>,
     timeout: Option<Duration>,
+    trust_dns: Option<bool>,
     #[cfg(any(feature = "native-tls", feature = "rustls"))]
     tls: ClientTls,
 }
@@ -174,6 +175,15 @@ impl ClientBuilder {
         self
     }
 
+    /// Enables/Disables the trust-dns async resolver.
+    ///
+    /// Default: true
+    pub fn set_trust_dns(mut self, trust_dns: bool) -> Self {
+        self.trust_dns = Some(trust_dns);
+
+        self
+    }
+
     /// Set path to certificate and private key file in PEM format. Used for TLS client authentication
     #[cfg(any(feature = "native-tls", feature = "rustls"))]
     pub fn set_keypair<T: Into<PathBuf>>(mut self, certificate: T, private_key: T) -> Self {
@@ -220,6 +230,12 @@ impl ClientBuilder {
         let builder = if self.tls.certificate.is_some() {
             let identity = self.tls.read_identity().await?;
             builder.identity(identity)
+        } else {
+            builder
+        };
+
+        let builder = if let Some(v) = self.trust_dns {
+            builder.trust_dns(v)
         } else {
             builder
         };
