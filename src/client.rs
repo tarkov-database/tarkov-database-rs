@@ -1,4 +1,4 @@
-use crate::{Result, DEFAULT_ORIGIN, ENDPOINT_VERSION};
+use crate::{Error, Result, DEFAULT_ORIGIN, ENDPOINT_VERSION};
 
 use std::{fmt, sync::Arc, time::Duration};
 
@@ -200,6 +200,10 @@ impl ClientBuilder {
     }
 
     pub async fn build(self) -> Result<Client> {
+        if self.token.is_empty() {
+            return Err(Error::TokenMissing);
+        }
+
         let builder = reqwest::ClientBuilder::new();
 
         #[cfg(any(feature = "native-tls", feature = "rustls"))]

@@ -17,6 +17,8 @@ pub type Result<T> = result::Result<T, Error>;
 pub enum Error {
     #[error("Resource(s) not found")]
     ResourceNotFound,
+    #[error("No token is set")]
+    TokenMissing,
     #[error("Authorization error: {0}")]
     Authorization(String),
     #[error("API error: {0}")]
