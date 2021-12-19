@@ -216,7 +216,8 @@ impl ClientBuilder {
         let builder = if let Some(v) = self.timeout {
             builder.timeout(v)
         } else {
-            builder
+            builder.timeout(Duration::from_secs(30))
+        };
         };
 
         let builder = if let Some(v) = self.user_agent {
