@@ -69,6 +69,7 @@ impl Client {
         let builder = reqwest::Client::builder()
             .timeout(TIMEOUT)
             .https_only(true)
+            .tcp_keepalive(Duration::from_secs(60))
             .user_agent(DEFAULT_USER_AGENT);
 
         #[cfg(any(feature = "native-tls", feature = "rustls"))]
@@ -123,6 +124,7 @@ pub struct ClientBuilder {
     origin: Option<String>,
     user_agent: Option<String>,
     timeout: Option<Duration>,
+    keep_alive: Option<Duration>,
     trust_dns: Option<bool>,
     #[cfg(any(feature = "native-tls", feature = "rustls"))]
     tls: ClientTls,
@@ -155,6 +157,15 @@ impl ClientBuilder {
     /// Default: 30 seconds
     pub fn set_timeout(mut self, timeout: Duration) -> Self {
         self.timeout = Some(timeout);
+
+        self
+    }
+
+    /// Set keep alive timeout
+    ///
+    /// Default: 60 seconds
+    pub fn set_keep_alive(mut self, duration: Duration) -> Self {
+        self.keep_alive = Some(duration);
 
         self
     }
@@ -218,6 +229,11 @@ impl ClientBuilder {
         } else {
             builder.timeout(Duration::from_secs(30))
         };
+
+        let builder = if let Some(v) = self.keep_alive {
+            builder.tcp_keepalive(v)
+        } else {
+            builder.tcp_keepalive(Duration::from_secs(60))
         };
 
         let builder = if let Some(v) = self.user_agent {
