@@ -315,6 +315,7 @@ impl ClientTls {
             return Err(ClientTlsError::NoPrivateKey.into());
         };
 
+        cert.extend_from_slice(b"\n");
         cert.append(&mut key);
 
         let identity = tls::Identity::from_pem(&cert[..])?;
