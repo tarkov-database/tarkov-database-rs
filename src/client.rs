@@ -212,7 +212,7 @@ impl ClientBuilder {
 
     pub async fn build(self) -> Result<Client> {
         if self.token.is_empty() {
-            return Err(Error::TokenMissing);
+            return Err(Error::MissingToken);
         }
 
         let builder = reqwest::ClientBuilder::new();

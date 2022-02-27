@@ -18,13 +18,19 @@ pub enum Error {
     #[error("Resource(s) not found")]
     ResourceNotFound,
     #[error("No token is set")]
-    TokenMissing,
+    MissingToken,
+    #[error("token is not valid")]
+    InvalidToken,
     #[error("Authorization error: {0}")]
     Authorization(String),
     #[error("API error: {0}")]
     ApiError(StatusResponse),
     #[error("IO error: {0}")]
     IoError(#[from] std::io::Error),
+    #[error("json error: {0}")]
+    Base64Error(#[from] base64::DecodeError),
+    #[error("json error: {0}")]
+    JsonError(#[from] serde_json::Error),
     #[error("reqwest error: {0}")]
     Client(#[from] reqwest::Error),
     #[error("url error: {0}")]

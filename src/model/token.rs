@@ -1,11 +1,11 @@
 use crate::{
     client::{Client, PathAndQuery},
-    Result,
+    Error, Result,
 };
 
+use base64::URL_SAFE_NO_PAD;
 use chrono::{serde::ts_seconds, DateTime, Utc};
-use jsonwebtoken::dangerous_insecure_decode;
-use serde::Deserialize;
+use serde::{de::DeserializeOwned, Deserialize};
 
 const ENDPOINT_TOKEN: &str = "token";
 
@@ -67,8 +67,8 @@ impl Client {
     /// Validate set token
     pub async fn token_is_valid(&self) -> bool {
         let token = &self.token.read().await;
-        let claims = match dangerous_insecure_decode::<TokenClaims>(token) {
-            Ok(d) => d.claims,
+        let claims = match decode_token_claims::<TokenClaims>(token) {
+            Ok(d) => d,
             Err(_) => return false,
         };
 
@@ -80,4 +80,16 @@ impl Client {
 
         true
     }
+}
+
+#[inline]
+fn decode_token_claims<T: DeserializeOwned>(token: &str) -> Result<T> {
+    let claims = token
+        .split('.')
+        .nth(1)
+        .ok_or(Error::InvalidToken)
+        .map(|v| base64::decode_config(v, URL_SAFE_NO_PAD))?
+        .map(|v| serde_json::from_slice(&v))??;
+
+    Ok(claims)
 }
