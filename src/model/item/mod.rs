@@ -1,5 +1,3 @@
-pub mod ammunition;
-pub mod armor;
 pub mod common;
 
 use crate::{
