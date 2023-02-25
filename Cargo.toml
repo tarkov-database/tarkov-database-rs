@@ -1,9 +1,9 @@
 [package]
 name = "tarkov-database-rs"
-version = "0.2.0-alpha.6"
+version = "0.2.0-alpha.7"
 authors = ["Markus Wiegand <mail@morphy2k.dev>"]
 edition = "2021"
-rust-version = "1.57"
+rust-version = "1.67"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
