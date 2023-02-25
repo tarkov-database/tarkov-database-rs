@@ -3,7 +3,7 @@ use crate::{
     Error, Result,
 };
 
-use base64::URL_SAFE_NO_PAD;
+use base64::{engine::general_purpose, Engine};
 use chrono::{serde::ts_seconds, DateTime, Utc};
 use serde::{de::DeserializeOwned, Deserialize};
 
@@ -88,7 +88,7 @@ fn decode_token_claims<T: DeserializeOwned>(token: &str) -> Result<T> {
         .split('.')
         .nth(1)
         .ok_or(Error::InvalidToken)
-        .map(|v| base64::decode_config(v, URL_SAFE_NO_PAD))?
+        .map(|v| general_purpose::URL_SAFE_NO_PAD.decode(v))?
         .map(|v| serde_json::from_slice(&v))??;
 
     Ok(claims)
